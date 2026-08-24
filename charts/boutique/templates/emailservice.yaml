@@ -1,0 +1,70 @@
+{{- $svc := .Values.services.emailservice }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emailservice
+  labels:
+    app: emailservice
+    {{- include "boutique.labels" . | nindent 4 }}
+spec:
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      app: emailservice
+  template:
+    metadata:
+      labels:
+        {{- include "boutique.selectorLabels" (dict "root" . "name" "emailservice") | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          image: {{ include "boutique.image" (dict "root" . "name" "emailservice") | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $svc.containerPort }}
+          env:
+            {{- range $key, $value := $svc.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          readinessProbe:
+            initialDelaySeconds: {{ $svc.probe.initialDelaySeconds }}
+            periodSeconds: {{ $svc.probe.periodSeconds }}
+            grpc:
+              port: {{ $svc.containerPort }}
+          livenessProbe:
+            initialDelaySeconds: {{ $svc.probe.initialDelaySeconds }}
+            periodSeconds: {{ $svc.probe.periodSeconds }}
+            grpc:
+              port: {{ $svc.containerPort }}
+          resources:
+            {{- toYaml .Values.defaults.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emailservice
+  labels:
+    app: emailservice
+    {{- include "boutique.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: emailservice
+  ports:
+    - name: grpc
+      port: {{ $svc.servicePort }}
+      targetPort: {{ $svc.containerPort }}

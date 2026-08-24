@@ -1,0 +1,68 @@
+{{- $svc := .Values.services.recommendationservice }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendationservice
+  labels:
+    app: recommendationservice
+    {{- include "boutique.labels" . | nindent 4 }}
+spec:
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      app: recommendationservice
+  template:
+    metadata:
+      labels:
+        {{- include "boutique.selectorLabels" (dict "root" . "name" "recommendationservice") | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          image: {{ include "boutique.image" (dict "root" . "name" "recommendationservice") | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $svc.containerPort }}
+          env:
+            {{- range $key, $value := $svc.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          readinessProbe:
+            periodSeconds: {{ $svc.probe.periodSeconds }}
+            grpc:
+              port: {{ $svc.containerPort }}
+          livenessProbe:
+            periodSeconds: {{ $svc.probe.periodSeconds }}
+            grpc:
+              port: {{ $svc.containerPort }}
+          resources:
+            {{- toYaml $svc.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommendationservice
+  labels:
+    app: recommendationservice
+    {{- include "boutique.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: recommendationservice
+  ports:
+    - name: grpc
+      port: {{ $svc.servicePort }}
+      targetPort: {{ $svc.containerPort }}
