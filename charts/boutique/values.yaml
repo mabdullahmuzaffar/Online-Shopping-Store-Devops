@@ -1,0 +1,170 @@
+# Single control panel for the chart.
+# Change image.tag / replicas / env here — do not edit templates for that.
+
+image:
+  registry: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo
+  tag: v0.10.6
+  pullPolicy: IfNotPresent
+
+# Applied to any templated service that does not set its own `resources`.
+defaults:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Frontend mustMapEnv — required at process start, even if that Service
+# is not deployed (SHOPPING_ASSISTANT_SERVICE_ADDR). Do not set ENABLE_ASSISTANT.
+frontendEnv:
+  PORT: "8080"
+  PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:3550"
+  CURRENCY_SERVICE_ADDR: "currencyservice:7000"
+  CART_SERVICE_ADDR: "cartservice:7070"
+  RECOMMENDATION_SERVICE_ADDR: "recommendationservice:8080"
+  SHIPPING_SERVICE_ADDR: "shippingservice:50051"
+  CHECKOUT_SERVICE_ADDR: "checkoutservice:5050"
+  AD_SERVICE_ADDR: "adservice:9555"
+  SHOPPING_ASSISTANT_SERVICE_ADDR: "shoppingassistantservice:80"
+  ENABLE_PROFILER: "0"
+
+checkoutEnv:
+  PORT: "5050"
+  PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:3550"
+  SHIPPING_SERVICE_ADDR: "shippingservice:50051"
+  PAYMENT_SERVICE_ADDR: "paymentservice:50051"
+  EMAIL_SERVICE_ADDR: "emailservice:5000"
+  CURRENCY_SERVICE_ADDR: "currencyservice:7000"
+  CART_SERVICE_ADDR: "cartservice:7070"
+
+# template: false → dedicated file (frontend / cart / redis), which also
+#                   defines its own probes and resources.
+# template: true  → rendered by templates/<name>.yaml via boutique.microservice.
+#
+# For templated services:
+#   probe.type            grpc (default) | tcp
+#   probe.*Seconds        optional timing overrides
+#   resources             optional; falls back to defaults.resources
+#   env                   inline map of environment variables
+#   envFrom              name of a top-level map to use instead of env
+#
+# loadgenerator stays off on a 2-CPU kind cluster.
+services:
+  frontend:
+    template: false
+    replicas: 1
+    containerPort: 8080
+    servicePort: 80
+    type: ClusterIP
+  cartservice:
+    template: false
+    replicas: 1
+    containerPort: 7070
+    servicePort: 7070
+    env:
+      REDIS_ADDR: "redis-cart:6379"
+  redis-cart:
+    template: false
+    replicas: 1
+    containerPort: 6379
+    servicePort: 6379
+    image: redis:alpine
+  productcatalogservice:
+    template: true
+    replicas: 1
+    containerPort: 3550
+    servicePort: 3550
+    env:
+      PORT: "3550"
+      DISABLE_PROFILER: "1"
+  currencyservice:
+    template: true
+    replicas: 1
+    containerPort: 7000
+    servicePort: 7000
+    env:
+      PORT: "7000"
+      DISABLE_PROFILER: "1"
+  recommendationservice:
+    template: true
+    replicas: 1
+    containerPort: 8080
+    servicePort: 8080
+    probe:
+      periodSeconds: 5
+    # Python service — needs materially more memory than the default.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 220Mi
+      limits:
+        cpu: 200m
+        memory: 450Mi
+    env:
+      PORT: "8080"
+      PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:3550"
+      DISABLE_PROFILER: "1"
+  checkoutservice:
+    template: true
+    replicas: 1
+    containerPort: 5050
+    servicePort: 5050
+    envFrom: checkoutEnv
+  shippingservice:
+    template: true
+    replicas: 1
+    containerPort: 50051
+    servicePort: 50051
+    probe:
+      periodSeconds: 5
+    env:
+      PORT: "50051"
+      DISABLE_PROFILER: "1"
+  paymentservice:
+    template: true
+    replicas: 1
+    containerPort: 50051
+    servicePort: 50051
+    env:
+      PORT: "50051"
+      DISABLE_PROFILER: "1"
+  emailservice:
+    template: true
+    replicas: 1
+    containerPort: 8080
+    servicePort: 5000
+    probe:
+      initialDelaySeconds: 15
+      periodSeconds: 5
+    env:
+      PORT: "8080"
+      DISABLE_PROFILER: "1"
+  adservice:
+    template: true
+    replicas: 1
+    containerPort: 9555
+    servicePort: 9555
+    probe:
+      initialDelaySeconds: 20
+      periodSeconds: 15
+    # JVM service — slowest to start and the heaviest of the backends.
+    resources:
+      requests:
+        cpu: 200m
+        memory: 180Mi
+      limits:
+        cpu: 300m
+        memory: 300Mi
+    env:
+      PORT: "9555"
+  loadgenerator:
+    template: false
+    replicas: 0
+    containerPort: 8089
+    servicePort: 8089
+    env:
+      FRONTEND_ADDR: "frontend:80"
+      USERS: "10"
+      RATE: "1"
