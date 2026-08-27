@@ -3,7 +3,7 @@
 
 image:
   registry: ghcr.io/mabdullahmuzaffar/Online-Shopping-Store-Devops
-  tag: " 6fea3098cc55ef90e18eeeba14e94a13875617f4"
+  tag: "6fea3098cc55ef90e18eeeba14e94a13875617f4"
   pullPolicy: IfNotPresent
 
 # Applied to any templated service that does not set its own `resources`.
