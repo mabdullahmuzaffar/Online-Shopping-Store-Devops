@@ -2,7 +2,7 @@
 # Change image.tag / replicas / env here — do not edit templates for that.
 
 image:
-  registry: ghcr.io/mabdullahmuzaffar/Online-Shopping-Store-Devops
+  registry: ghcr.io/mabdullahmuzaffar/online-shopping-store-devops
   tag: "6fea3098cc55ef90e18eeeba14e94a13875617f4"
   pullPolicy: IfNotPresent
 
